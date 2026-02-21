@@ -1,6 +1,6 @@
 {
   "name": "git-project-updater",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Electron app for scanning WSL projects and running dependency + git updates.",
   "main": "dist/main/main.js",
   "author": "User",
