@@ -1,0 +1,64 @@
+{
+  "name": "git-project-updater",
+  "version": "0.1.0",
+  "description": "Electron app for scanning WSL projects and running dependency + git updates.",
+  "main": "dist/main/main.js",
+  "author": "User",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"tsc -p tsconfig.main.json -w\" \"wait-on tcp:5173 && wait-on dist/main/main.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "build": "npm run build:renderer && npm run build:main",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.main.json",
+    "start": "electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.main.json",
+    "dist": "npm run build && electron-builder",
+    "release": "release-it"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "lucide-react": "^0.543.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@release-it/conventional-changelog": "^10.0.5",
+    "@types/node": "^22.18.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^32.2.7",
+    "electron-builder": "^24.13.3",
+    "release-it": "^19.2.4",
+    "typescript": "^5.9.2",
+    "vite": "^5.4.10",
+    "vitest": "^1.6.0",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.user.gitprojectupdater",
+    "productName": "Git Project Updater",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
