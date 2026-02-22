@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/dbfx/git-projects-updater/compare/v0.3.0...v0.3.1) (2026-02-22)
+
+
+### Bug Fixes
+
+* publish releases as non-draft and add download button to README ([94bbd1a](https://github.com/dbfx/git-projects-updater/commit/94bbd1aad851f53553bc11f391935b2b5413f037))
+
 # [0.3.0](https://github.com/dbfx/git-projects-updater/compare/v0.2.0...v0.3.0) (2026-02-22)
 
 
