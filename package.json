@@ -64,7 +64,8 @@
     "publish": {
       "provider": "github",
       "owner": "dbfx",
-      "repo": "git-projects-updater"
+      "repo": "git-projects-updater",
+      "releaseType": "release"
     }
   }
 }

@@ -4,6 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/dbfx/git-projects-updater)](https://github.com/dbfx/git-projects-updater/releases/latest)
 
+[![Download Latest](https://img.shields.io/badge/Download-Windows%20Installer-blue?style=for-the-badge&logo=windows)](https://github.com/dbfx/git-projects-updater/releases/latest)
+
 Electron desktop app for Windows that scans WSL project roots, detects update-capable repositories, previews actions, and executes dependency + git automation with safety gates.
 
 ## Screenshot
