@@ -780,6 +780,17 @@ function SettingsPanel(): JSX.Element {
               label=""
             />
           </div>
+          <div className="settings-row">
+            <div>
+              <div className="settings-row-label">Ensure LF line endings</div>
+              <div className="settings-row-desc">Create .gitattributes if missing to enforce Unix line endings</div>
+            </div>
+            <Toggle
+              checked={settings.ensureLineEndings}
+              onChange={(v) => updateSettings({ ensureLineEndings: v })}
+              label=""
+            />
+          </div>
         </div>
         <div className="commit-msg">
           Commit message: <strong>{settings.commitMessage}</strong>

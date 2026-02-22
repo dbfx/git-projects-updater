@@ -21,6 +21,7 @@ export interface AppSettings {
   retryCount: number;
   retryDelayMs: number;
   commitMessage: string;
+  ensureLineEndings: boolean;
   tools: ToolToggles;
 }
 

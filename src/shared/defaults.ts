@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   retryCount: 3,
   retryDelayMs: 2000,
   commitMessage: "chore: update dependencies [skip ci]",
+  ensureLineEndings: true,
   tools: {
     composer: true,
     npm: true,

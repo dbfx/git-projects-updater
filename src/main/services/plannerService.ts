@@ -118,6 +118,13 @@ export function buildPreviewActions(
         });
       }
 
+      if (skipReasons.length === 0 && settings.ensureLineEndings) {
+        commands.push({
+          label: "Ensure .gitattributes (LF)",
+          command: `if [ ! -f .gitattributes ]; then printf '* text=auto eol=lf\\n' > .gitattributes; echo 'Created .gitattributes'; else echo '.gitattributes already exists'; fi`
+        });
+      }
+
       if (skipReasons.length === 0) {
         commands.push(...buildToolCommands(project, mergedTools));
         commands.push({
