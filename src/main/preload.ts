@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { AppApi, AppSettings, ProjectPreference, RunRequest, ScanRoot } from "../shared/types";
+import { AppApi, AppSettings, ProjectPreference, RunRequest, ScanRoot, UpdateState } from "../shared/types";
 
 const api: AppApi = {
   settings: {
@@ -43,6 +43,20 @@ const api: AppApi = {
   },
   wsl: {
     listDistros: () => ipcRenderer.invoke("wsl:listDistros")
+  },
+  update: {
+    check: () => ipcRenderer.invoke("update:check"),
+    download: () => ipcRenderer.invoke("update:download"),
+    install: () => ipcRenderer.invoke("update:install"),
+    onStatus: (listener: (state: UpdateState) => void) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+        listener(payload as UpdateState);
+      };
+      ipcRenderer.on("update:status", wrapped);
+      return () => {
+        ipcRenderer.removeListener("update:status", wrapped);
+      };
+    }
   }
 };
 

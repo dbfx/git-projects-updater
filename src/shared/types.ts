@@ -154,6 +154,15 @@ export interface WslDistro {
   isDefault: boolean;
 }
 
+export type UpdateStatus = "idle" | "checking" | "available" | "not-available" | "downloading" | "ready" | "error";
+
+export interface UpdateState {
+  status: UpdateStatus;
+  version?: string;
+  progress?: number;
+  error?: string;
+}
+
 export interface AppApi {
   settings: {
     get: () => Promise<AppSettings>;
@@ -190,5 +199,11 @@ export interface AppApi {
   };
   wsl: {
     listDistros: () => Promise<WslDistro[]>;
+  };
+  update: {
+    check: () => Promise<void>;
+    download: () => Promise<void>;
+    install: () => void;
+    onStatus: (listener: (state: UpdateState) => void) => () => void;
   };
 }

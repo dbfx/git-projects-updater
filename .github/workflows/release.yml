@@ -30,14 +30,7 @@ jobs:
       - name: Run tests
         run: npm run test
 
-      - name: Build Electron app
-        run: npm run dist
-
-      - name: Upload artifacts to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: false
-          generate_release_notes: false
-          files: |
-            release/*.exe
-            release/*.exe.blockmap
+      - name: Build and publish
+        run: npm run build && npx electron-builder --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

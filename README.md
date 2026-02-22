@@ -8,7 +8,6 @@ Electron desktop app for Windows that scans WSL project roots, detects update-ca
 
 ## Screenshot
 
-<!-- Add a screenshot of the app here -->
 ![App Screenshot](docs/screenshot.png)
 
 ## Features

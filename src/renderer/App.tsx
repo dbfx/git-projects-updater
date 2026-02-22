@@ -3,6 +3,7 @@ import {
   AlertCircle,
   Clock,
   Cog,
+  Download,
   Eye,
   FolderOpen,
   FolderSearch,
@@ -14,6 +15,7 @@ import {
   Plus,
   RefreshCw,
   Rocket,
+  RotateCcw,
   Search,
   Square,
   Terminal,
@@ -941,6 +943,53 @@ const PAGE_META: Record<TabId, { title: string; subtitle: string }> = {
 };
 
 /* ------------------------------------------------------------------ */
+/*  Update banner                                                      */
+/* ------------------------------------------------------------------ */
+
+function UpdateBanner(): JSX.Element | null {
+  const updateState = useAppStore((s) => s.updateState);
+  const downloadUpdate = useAppStore((s) => s.downloadUpdate);
+  const installUpdate = useAppStore((s) => s.installUpdate);
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed || updateState.status === "idle" || updateState.status === "checking" || updateState.status === "not-available") {
+    return null;
+  }
+
+  if (updateState.status === "error") {
+    return null;
+  }
+
+  return (
+    <div className="toast toast-update">
+      <Download size={16} className="toast-icon" />
+      {updateState.status === "available" && (
+        <>
+          <span className="toast-msg">Update available: v{updateState.version}</span>
+          <button className="btn btn-primary btn-sm" onClick={() => downloadUpdate()}>
+            <Download size={13} /> Download
+          </button>
+        </>
+      )}
+      {updateState.status === "downloading" && (
+        <span className="toast-msg">Downloading update... {updateState.progress ?? 0}%</span>
+      )}
+      {updateState.status === "ready" && (
+        <>
+          <span className="toast-msg">Update ready — restart to apply</span>
+          <button className="btn btn-primary btn-sm" onClick={() => installUpdate()}>
+            <RotateCcw size={13} /> Restart
+          </button>
+        </>
+      )}
+      <button className="toast-close" onClick={() => setDismissed(true)}>
+        <X size={14} />
+      </button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main App                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -982,6 +1031,8 @@ export default function App(): JSX.Element {
           {activeTab === "settings" && <SettingsPanel />}
         </div>
       </div>
+
+      <UpdateBanner />
 
       {error && (
         <div className="toast toast-error">

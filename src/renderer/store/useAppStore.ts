@@ -8,6 +8,7 @@ import {
   RunStatus,
   RunSummary,
   ScanRoot,
+  UpdateState,
   WslDistro
 } from "../../shared/types";
 
@@ -32,7 +33,9 @@ interface AppState {
     running: boolean;
   };
   error: string | null;
+  updateState: UpdateState;
   runEventUnsubscribe: (() => void) | null;
+  updateStatusUnsubscribe: (() => void) | null;
   initialize: () => Promise<void>;
   setActiveTab: (tab: TabId) => void;
   setError: (error: string | null) => void;
@@ -49,6 +52,9 @@ interface AppState {
   startRun: () => Promise<void>;
   cancelRun: () => Promise<void>;
   clearHistory: () => Promise<void>;
+  checkForUpdates: () => Promise<void>;
+  downloadUpdate: () => Promise<void>;
+  installUpdate: () => void;
 }
 
 async function loadInitialState() {
@@ -90,7 +96,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     running: false
   },
   error: null,
+  updateState: { status: "idle" },
   runEventUnsubscribe: null,
+  updateStatusUnsubscribe: null,
 
   initialize: async () => {
     if (get().initialized) {
@@ -115,8 +123,13 @@ export const useAppStore = create<AppState>((set, get) => ({
           runEvents: [event, ...state.runEvents].slice(0, 500)
         }));
       });
+      const updateUnsub = window.api.update.onStatus((state) => {
+        set({ updateState: state });
+      });
+      window.api.update.check().catch(() => {});
       set({
         initialized: true,
+        updateStatusUnsubscribe: updateUnsub,
         settings: {
           ...payload.settings,
           distro: autoDistro
@@ -304,6 +317,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearHistory: async () => {
     await window.api.history.clear();
     set({ history: [] });
+  },
+
+  checkForUpdates: async () => {
+    await window.api.update.check();
+  },
+
+  downloadUpdate: async () => {
+    await window.api.update.download();
+  },
+
+  installUpdate: () => {
+    window.api.update.install();
   }
 }));
 

@@ -7,6 +7,7 @@ import { buildPreviewActions } from "./services/plannerService";
 import { ScannerService } from "./services/scannerService";
 import { RunnerService } from "./services/runnerService";
 import { stateStore } from "./services/stateStore";
+import { checkForUpdates, downloadUpdate, quitAndInstall } from "./services/updaterService";
 import { listWslDistros } from "./services/wslService";
 
 const scannerService = new ScannerService();
@@ -220,6 +221,18 @@ export function registerIpcHandlers(window: BrowserWindow): void {
     return listWslDistros();
   });
 
+  ipcMain.handle("update:check", async () => {
+    await checkForUpdates();
+  });
+
+  ipcMain.handle("update:download", async () => {
+    await downloadUpdate();
+  });
+
+  ipcMain.handle("update:install", async () => {
+    quitAndInstall();
+  });
+
   ipcMain.handle("app:defaults", async () => DEFAULT_SETTINGS);
 }
 
@@ -243,6 +256,9 @@ export function unregisterIpcHandlers(): void {
     "history:get",
     "history:clear",
     "wsl:listDistros",
+    "update:check",
+    "update:download",
+    "update:install",
     "app:defaults"
   ];
 

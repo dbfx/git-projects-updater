@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from "electron";
 import path from "node:path";
 import { registerIpcHandlers, unregisterIpcHandlers } from "./ipc";
+import { initAutoUpdater } from "./services/updaterService";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -27,6 +28,7 @@ async function createMainWindow(): Promise<void> {
   });
 
   registerIpcHandlers(mainWindow);
+  initAutoUpdater(mainWindow);
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
