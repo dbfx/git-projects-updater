@@ -61,17 +61,23 @@ function buildToolCommands(project: DiscoveredProject, tools: EffectiveProjectTo
     }
   }
 
+  // Probe for a virtual environment before running pip commands (avoids PEP 668 errors)
+  const venvProbe = 'PY=python; for d in .venv venv env; do [ -x "$d/bin/python" ] && PY="$d/bin/python" && break; done';
+
   if (tools.pip && project.manifests.requirementsIn) {
     commands.push({
       label: "pip-compile upgrade",
       command:
-        "if command -v pip-compile >/dev/null 2>&1; then pip-compile --upgrade requirements.in; elif [ -f requirements.txt ]; then python -m pip install --upgrade -r requirements.txt; else echo 'pip-compile not found and no requirements.txt fallback'; fi",
+        `${venvProbe}; PC=pip-compile; for d in .venv venv env; do [ -x "$d/bin/pip-compile" ] && PC="$d/bin/pip-compile" && break; done; ` +
+        'if command -v "$PC" >/dev/null 2>&1; then $PC --upgrade requirements.in; ' +
+        'elif [ -f requirements.txt ]; then $PY -m pip install --upgrade -r requirements.txt; ' +
+        "else echo 'pip-compile not found and no requirements.txt fallback'; fi",
       retriable: true
     });
   } else if (tools.pip && project.manifests.requirementsTxt) {
     commands.push({
       label: "pip requirements update",
-      command: "python -m pip install --upgrade -r requirements.txt",
+      command: `${venvProbe}; $PY -m pip install --upgrade -r requirements.txt`,
       retriable: true
     });
   }

@@ -13,6 +13,18 @@ import {
 import { sleep } from "../lib/utils";
 import { executeWslCommand } from "./wslExecutor";
 
+const STDERR_NOISE_PATTERNS: RegExp[] = [
+  /screen size is bogus/i,
+  /^warning: terminal is not fully functional/i,
+  /^tput:/i,
+  /^Could not set up resize listener/i
+];
+
+function isStderrNoise(line: string): boolean {
+  const trimmed = line.trim();
+  return STDERR_NOISE_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
 interface StartRunInput {
   distro: string;
   actions: PlannedAction[];
@@ -174,7 +186,7 @@ export class RunnerService {
             }
           },
           onStderr: (line) => {
-            if (line.trim()) {
+            if (line.trim() && !isStderrNoise(line)) {
               emit(makeEvent(runId, projectId, projectName, command.label, "warning", line, "stderr"));
             }
           }

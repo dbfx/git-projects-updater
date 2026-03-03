@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
+  CheckCircle2,
   Clock,
   Cog,
   Download,
@@ -17,13 +18,15 @@ import {
   Rocket,
   RotateCcw,
   Search,
+  SkipForward,
   Square,
   Terminal,
   Timer,
   Trash2,
-  X
+  X,
+  XCircle
 } from "lucide-react";
-import { DiscoveredProject } from "../shared/types";
+import { DiscoveredProject, RunEvent } from "../shared/types";
 import { TabId, useAppStore } from "./store/useAppStore";
 
 /* ------------------------------------------------------------------ */
@@ -163,10 +166,14 @@ function Dashboard(): JSX.Element {
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const startScan = useAppStore((s) => s.startScan);
   const requestPreview = useAppStore((s) => s.requestPreview);
+  const runUpdates = useAppStore((s) => s.runUpdates);
   const busy = useAppStore((s) => s.busy);
 
+  const hasRoots = roots.length > 0;
+  const hasProjects = projects.length > 0;
   const eligible = projects.filter((p) => !p.skipReason).length;
   const lastRun = history[0];
+  const isBusy = busy.scanning || busy.running || busy.previewing;
 
   return (
     <div className="dashboard animate-in">
@@ -202,35 +209,64 @@ function Dashboard(): JSX.Element {
       </div>
 
       <div className="welcome-card">
-        <h2>Project Update Flight Deck</h2>
-        <p>
-          Scan your WSL workspace, preview exact commands, and run sequential dependency updates
-          with git safety gates and history tracking.
-        </p>
-        <div className="welcome-actions">
-          <button className="btn btn-primary" disabled={busy.scanning} onClick={() => startScan()}>
-            {busy.scanning ? (
-              <>
-                <Loader2 size={14} className="icon-spin" /> Scanning...
-              </>
-            ) : (
-              <>
-                <Search size={14} /> Scan Roots
-              </>
-            )}
-          </button>
-          <button className="btn" disabled={busy.previewing} onClick={() => requestPreview()}>
-            {busy.previewing ? (
-              <>
-                <Loader2 size={14} className="icon-spin" /> Preparing...
-              </>
-            ) : (
-              <>
-                <Eye size={14} /> Preview Run
-              </>
-            )}
-          </button>
-        </div>
+        {!hasRoots ? (
+          <>
+            <h2>Get Started</h2>
+            <p>
+              Add a WSL scan root to discover your projects, then run dependency updates across all
+              of them with a single click.
+            </p>
+            <div className="welcome-actions">
+              <button className="btn btn-primary" onClick={() => setActiveTab("roots")}>
+                <Plus size={14} /> Add Scan Root
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2>Project Update Flight Deck</h2>
+            <p>
+              {hasProjects
+                ? `${eligible} eligible project${eligible !== 1 ? "s" : ""} ready to update.`
+                : "Scan your workspace to discover projects, or just hit Run and it will scan automatically."}
+            </p>
+            <div className="welcome-actions">
+              <button
+                className="btn btn-primary"
+                disabled={isBusy}
+                onClick={() => runUpdates()}
+              >
+                {busy.running ? (
+                  <><Loader2 size={14} className="icon-spin" /> Running...</>
+                ) : busy.scanning ? (
+                  <><Loader2 size={14} className="icon-spin" /> Scanning...</>
+                ) : (
+                  <><Play size={14} /> Run Updates</>
+                )}
+              </button>
+              <button
+                className="btn"
+                disabled={isBusy}
+                onClick={() => requestPreview()}
+              >
+                {busy.previewing ? (
+                  <><Loader2 size={14} className="icon-spin" /> Preview</>
+                ) : (
+                  <><Eye size={14} /> Preview</>
+                )}
+              </button>
+              {hasProjects && (
+                <button
+                  className="btn btn-ghost"
+                  disabled={isBusy}
+                  onClick={() => startScan()}
+                >
+                  <RefreshCw size={14} /> Rescan
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -543,16 +579,144 @@ function RunPreview(): JSX.Element {
 /*  Run Monitor                                                        */
 /* ------------------------------------------------------------------ */
 
+function deriveProgress(events: RunEvent[], totalProjects: number) {
+  const completed = new Set<string>();
+  const failed = new Set<string>();
+  const skipped = new Set<string>();
+  let currentProject: string | undefined;
+
+  // Events are newest-first, so iterate in reverse to find state
+  for (let i = events.length - 1; i >= 0; i--) {
+    const ev = events[i];
+    const pid = ev.projectId;
+    if (!pid) continue;
+
+    if (ev.stage === "project" && ev.level === "success") {
+      completed.add(pid);
+    } else if (ev.stage === "project" && ev.level === "error") {
+      failed.add(pid);
+    } else if (
+      (ev.stage === "project" && ev.level === "warning" && ev.message.startsWith("Skipped:")) ||
+      (ev.stage === "validate" && ev.level === "warning")
+    ) {
+      skipped.add(pid);
+    }
+  }
+
+  // Current project = most recent event's project that isn't finished yet
+  for (const ev of events) {
+    if (ev.projectName && ev.projectId && !completed.has(ev.projectId) && !failed.has(ev.projectId) && !skipped.has(ev.projectId)) {
+      currentProject = ev.projectName;
+      break;
+    }
+  }
+
+  const done = completed.size + failed.size + skipped.size;
+  return {
+    total: totalProjects,
+    done,
+    succeeded: completed.size,
+    failed: failed.size,
+    skipped: skipped.size,
+    remaining: Math.max(0, totalProjects - done),
+    currentProject,
+    pct: totalProjects > 0 ? Math.round((done / totalProjects) * 100) : 0
+  };
+}
+
 function RunMonitor(): JSX.Element {
   const runEvents = useAppStore((s) => s.runEvents);
   const runStatus = useAppStore((s) => s.runStatus);
   const cancelRun = useAppStore((s) => s.cancelRun);
   const busy = useAppStore((s) => s.busy);
+  const previewActions = useAppStore((s) => s.previewActions);
 
   const isRunning = runStatus.state === "running";
 
+  const totalProjects = previewActions.length;
+  const progress = useMemo(
+    () => deriveProgress(runEvents, totalProjects),
+    [runEvents, totalProjects]
+  );
+
   return (
     <div className="gap-y animate-in">
+      {/* Progress Panel */}
+      {(isRunning || progress.done > 0) && totalProjects > 0 && (
+        <div className="monitor-progress">
+          <div className="monitor-progress-header">
+            <div className="monitor-progress-title">
+              {isRunning ? (
+                <>
+                  <Loader2 size={15} className="icon-spin" />
+                  <span>
+                    Updating {progress.currentProject || "..."}
+                    <span className="monitor-progress-counter">
+                      {progress.done + 1} of {progress.total}
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={15} />
+                  <span>
+                    Run complete
+                    <span className="monitor-progress-counter">
+                      {progress.done} of {progress.total} processed
+                    </span>
+                  </span>
+                </>
+              )}
+            </div>
+            {isRunning && (
+              <button className="btn btn-sm btn-danger" onClick={() => cancelRun()}>
+                <Square size={10} /> Stop
+              </button>
+            )}
+          </div>
+
+          <div className="monitor-progress-bar-track">
+            {progress.succeeded > 0 && (
+              <div
+                className="monitor-progress-bar-fill success"
+                style={{ width: `${percent(progress.succeeded, progress.total)}%` }}
+              />
+            )}
+            {progress.failed > 0 && (
+              <div
+                className="monitor-progress-bar-fill failed"
+                style={{ width: `${percent(progress.failed, progress.total)}%` }}
+              />
+            )}
+            {progress.skipped > 0 && (
+              <div
+                className="monitor-progress-bar-fill skipped"
+                style={{ width: `${percent(progress.skipped, progress.total)}%` }}
+              />
+            )}
+          </div>
+
+          <div className="monitor-progress-stats">
+            <span className="monitor-stat">
+              <CheckCircle2 size={13} className="monitor-stat-icon stat-success" />
+              {progress.succeeded} succeeded
+            </span>
+            <span className="monitor-stat">
+              <XCircle size={13} className="monitor-stat-icon stat-failed" />
+              {progress.failed} failed
+            </span>
+            <span className="monitor-stat">
+              <SkipForward size={13} className="monitor-stat-icon stat-skipped" />
+              {progress.skipped} skipped
+            </span>
+            <span className="monitor-stat monitor-stat-muted">
+              {progress.remaining} remaining
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Terminal */}
       <div className="terminal">
         <div className="terminal-header">
           <div className="terminal-dots">
@@ -563,15 +727,6 @@ function RunMonitor(): JSX.Element {
           <div className="terminal-status">
             <span className={`status-dot ${isRunning ? "running" : "idle"}`} />
             {runStatus.state}
-            {isRunning && (
-              <button
-                className="btn btn-sm btn-danger"
-                style={{ marginLeft: 8 }}
-                onClick={() => cancelRun()}
-              >
-                <Square size={10} /> Stop
-              </button>
-            )}
           </div>
         </div>
         <div className="terminal-body">
@@ -853,10 +1008,17 @@ function SettingsPanel(): JSX.Element {
 function Sidebar(): JSX.Element {
   const activeTab = useAppStore((s) => s.activeTab);
   const setActiveTab = useAppStore((s) => s.setActiveTab);
+  const roots = useAppStore((s) => s.roots);
+  const projects = useAppStore((s) => s.projects);
   const startScan = useAppStore((s) => s.startScan);
   const requestPreview = useAppStore((s) => s.requestPreview);
+  const runUpdates = useAppStore((s) => s.runUpdates);
   const busy = useAppStore((s) => s.busy);
   const runState = useAppStore((s) => s.runStatus.state);
+
+  const hasRoots = roots.length > 0;
+  const hasProjects = projects.length > 0;
+  const isBusy = busy.scanning || busy.running || busy.previewing;
 
   return (
     <aside className="sidebar">
@@ -893,36 +1055,50 @@ function Sidebar(): JSX.Element {
       </nav>
 
       <div className="sidebar-actions">
-        <button
-          className="btn btn-primary btn-full btn-sm"
-          disabled={busy.scanning}
-          onClick={() => startScan()}
-        >
-          {busy.scanning ? (
-            <>
-              <Loader2 size={13} className="icon-spin" /> Scanning...
-            </>
-          ) : (
-            <>
-              <Search size={13} /> Scan Roots
-            </>
-          )}
-        </button>
-        <button
-          className="btn btn-full btn-sm"
-          disabled={busy.previewing}
-          onClick={() => requestPreview()}
-        >
-          {busy.previewing ? (
-            <>
-              <Loader2 size={13} className="icon-spin" /> Preparing...
-            </>
-          ) : (
-            <>
-              <Eye size={13} /> Preview Run
-            </>
-          )}
-        </button>
+        {!hasRoots ? (
+          <button
+            className="btn btn-primary btn-full btn-sm"
+            onClick={() => setActiveTab("roots")}
+          >
+            <Plus size={13} /> Add Scan Root
+          </button>
+        ) : (
+          <>
+            <button
+              className="btn btn-primary btn-full btn-sm"
+              disabled={isBusy}
+              onClick={() => runUpdates()}
+            >
+              {busy.running ? (
+                <><Loader2 size={13} className="icon-spin" /> Running...</>
+              ) : busy.scanning ? (
+                <><Loader2 size={13} className="icon-spin" /> Scanning...</>
+              ) : (
+                <><Play size={13} /> Run Updates</>
+              )}
+            </button>
+            <div className="sidebar-secondary-actions">
+              <button
+                className="btn btn-ghost btn-sm"
+                disabled={isBusy}
+                onClick={() => requestPreview()}
+              >
+                {busy.previewing ? (
+                  <><Loader2 size={13} className="icon-spin" /> Preview</>
+                ) : (
+                  <><Eye size={13} /> Preview</>
+                )}
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                disabled={isBusy}
+                onClick={() => startScan()}
+              >
+                <RefreshCw size={13} /> {hasProjects ? "Rescan" : "Scan"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </aside>
   );

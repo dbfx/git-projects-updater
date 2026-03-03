@@ -50,6 +50,7 @@ interface AppState {
   selectAllProjects: (enabled: boolean) => void;
   requestPreview: () => Promise<void>;
   startRun: () => Promise<void>;
+  runUpdates: () => Promise<void>;
   cancelRun: () => Promise<void>;
   clearHistory: () => Promise<void>;
   checkForUpdates: () => Promise<void>;
@@ -104,8 +105,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (get().initialized) {
       return;
     }
-    set((state) => ({ busy: { ...state.busy, loading: true } }));
+    // Set immediately to prevent duplicate calls from StrictMode / hot reload
+    set((state) => ({ initialized: true, busy: { ...state.busy, loading: true } }));
     try {
+      // Clean up any previous listeners (StrictMode remount)
+      get().runEventUnsubscribe?.();
+      get().updateStatusUnsubscribe?.();
+
       const payload = await loadInitialState();
       const autoDistro =
         payload.settings.distro ||
@@ -128,7 +134,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       window.api.update.check().catch(() => {});
       set({
-        initialized: true,
         updateStatusUnsubscribe: updateUnsub,
         settings: {
           ...payload.settings,
@@ -285,14 +290,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   startRun: async () => {
+    const request = buildRequest(get().selectedProjectIds);
     set((state) => ({
       busy: { ...state.busy, running: true },
+      runStatus: { state: "running" },
       error: null,
       runEvents: [],
       activeTab: "monitor"
     }));
     try {
-      const summary = await window.api.run.start(buildRequest(get().selectedProjectIds));
+      // Fetch preview actions so the monitor progress panel knows the total
+      const actions = await window.api.run.preview(request);
+      set({ previewActions: actions });
+
+      const summary = await window.api.run.start(request);
       set((state) => ({
         history: [summary, ...state.history].slice(0, 50),
         activeTab: "history"
@@ -306,6 +317,37 @@ export const useAppStore = create<AppState>((set, get) => ({
         busy: { ...state.busy, running: false }
       }));
     }
+  },
+
+  runUpdates: async () => {
+    const state = get();
+    if (state.roots.length === 0) {
+      set({ activeTab: "roots" });
+      return;
+    }
+
+    // Auto-scan if no projects discovered yet
+    if (state.projects.length === 0) {
+      set((s) => ({ busy: { ...s.busy, scanning: true }, error: null }));
+      try {
+        const result = await window.api.scan.start();
+        const ids = result.projects
+          .filter((p) => p.enabled && !p.skipReason)
+          .map((p) => p.id);
+        set({ projects: result.projects, selectedProjectIds: ids });
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : String(error),
+          busy: { ...get().busy, scanning: false }
+        });
+        return;
+      } finally {
+        set((s) => ({ busy: { ...s.busy, scanning: false } }));
+      }
+    }
+
+    // Now start the run
+    await get().startRun();
   },
 
   cancelRun: async () => {
