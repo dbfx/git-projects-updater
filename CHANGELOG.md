@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.4.0](https://github.com/dbfx/git-projects-updater/compare/v0.3.1...v0.4.0) (2026-03-03)
+
+
+### Features
+
+* improve monitor page ([400ed4d](https://github.com/dbfx/git-projects-updater/commit/400ed4d7e5694573041d164711498bbc3da57cf7))
+
 ## [0.3.1](https://github.com/dbfx/git-projects-updater/compare/v0.3.0...v0.3.1) (2026-02-22)
 
 
