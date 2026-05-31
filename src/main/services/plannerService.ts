@@ -29,6 +29,16 @@ function gitSkipReasons(project: DiscoveredProject): string[] {
   return [];
 }
 
+// Only pnpm is supported for JavaScript projects. A repo with a package.json that
+// is not set up with pnpm (no pnpm-lock.yaml) is skipped entirely — npm/yarn/bun
+// are never run.
+function packageManagerSkipReasons(project: DiscoveredProject): string[] {
+  if (project.manifests.packageJson && project.jsManager !== "pnpm") {
+    return ["JavaScript project does not use pnpm (only pnpm is supported)"];
+  }
+  return [];
+}
+
 function buildToolCommands(project: DiscoveredProject, tools: EffectiveProjectTools): PlannedCommand[] {
   const commands: PlannedCommand[] = [];
   if (project.manifests.composerJson && tools.composer) {
@@ -39,26 +49,13 @@ function buildToolCommands(project: DiscoveredProject, tools: EffectiveProjectTo
     });
   }
 
-  if (project.manifests.packageJson) {
-    if (project.jsManager === "pnpm" && tools.pnpm) {
-      commands.push({
-        label: "pnpm update",
-        command: "pnpm update --reporter=silent",
-        retriable: true
-      });
-    } else if (project.jsManager === "yarn" && tools.yarn) {
-      commands.push({
-        label: "yarn upgrade",
-        command: "yarn upgrade --silent",
-        retriable: true
-      });
-    } else if (project.jsManager === "npm" && tools.npm) {
-      commands.push({
-        label: "npm update",
-        command: "npm update --silent",
-        retriable: true
-      });
-    }
+  // pnpm only — npm/yarn/bun are never run. Non-pnpm JS repos are skipped upstream.
+  if (project.manifests.packageJson && project.jsManager === "pnpm" && tools.pnpm) {
+    commands.push({
+      label: "pnpm update",
+      command: "pnpm update --reporter=silent",
+      retriable: true
+    });
   }
 
   // Probe for a virtual environment before running pip commands (avoids PEP 668 errors)
@@ -114,6 +111,7 @@ export function buildPreviewActions(
         skipReasons.push("Project disabled");
       }
       skipReasons.push(...gitSkipReasons(project));
+      skipReasons.push(...packageManagerSkipReasons(project));
 
       const commands: PlannedCommand[] = [];
       if (skipReasons.length === 0 && settings.pullBeforeUpdate) {

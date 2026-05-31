@@ -85,6 +85,58 @@ describe("plannerService", () => {
     expect(labels).toContain("pip-compile upgrade");
   });
 
+  it("skips JavaScript projects that do not use pnpm", () => {
+    const project = makeProject({
+      id: "npm-proj",
+      name: "legacy",
+      manifests: {
+        composerJson: false,
+        packageJson: true,
+        pnpmLock: false,
+        yarnLock: false,
+        packageLock: true,
+        requirementsIn: false,
+        requirementsTxt: false
+      },
+      jsManager: "npm"
+    });
+    const [action] = buildPreviewActions(
+      [project],
+      {},
+      settings,
+      { selectedProjectIds: [project.id] } satisfies RunRequest
+    );
+    expect(action.skipReasons.some((reason) => reason.includes("pnpm"))).toBe(true);
+    expect(action.commands.length).toBe(0);
+  });
+
+  it("only runs pnpm for JavaScript projects", () => {
+    const project = makeProject({
+      id: "pnpm-proj",
+      name: "modern",
+      manifests: {
+        composerJson: false,
+        packageJson: true,
+        pnpmLock: true,
+        yarnLock: false,
+        packageLock: false,
+        requirementsIn: false,
+        requirementsTxt: false
+      },
+      jsManager: "pnpm"
+    });
+    const [action] = buildPreviewActions(
+      [project],
+      {},
+      settings,
+      { selectedProjectIds: [project.id] } satisfies RunRequest
+    );
+    const labels = action.commands.map((command) => command.label);
+    expect(labels).toContain("pnpm update");
+    expect(labels).not.toContain("npm update");
+    expect(labels).not.toContain("yarn upgrade");
+  });
+
   it("skips dirty repositories", () => {
     const project = makeProject({
       id: "x",
