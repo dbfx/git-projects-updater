@@ -22,6 +22,8 @@ function makeProject(partial: Partial<DiscoveredProject>): DiscoveredProject {
     cleanState: partial.cleanState ?? "clean",
     enabled: partial.enabled ?? true,
     jsManager: partial.jsManager ?? "none",
+    declaredPackageManager: partial.declaredPackageManager,
+    packageManagerReadError: partial.packageManagerReadError,
     skipReason: partial.skipReason
   };
 }
@@ -34,6 +36,7 @@ const settings: AppSettings = {
   retryCount: 3,
   retryDelayMs: 2000,
   commitMessage: "chore: update dependencies [skip ci]",
+  ensureLineEndings: true,
   tools: {
     composer: true,
     npm: true,
@@ -135,6 +138,99 @@ describe("plannerService", () => {
     expect(labels).toContain("pnpm update");
     expect(labels).not.toContain("npm update");
     expect(labels).not.toContain("yarn upgrade");
+
+    const pnpmCommand = action.commands.find((command) => command.label === "pnpm update");
+    expect(pnpmCommand?.command).toContain(
+      "pnpm update --latest --lockfile-only --ignore-scripts --no-frozen-lockfile"
+    );
+    expect(pnpmCommand?.command).toContain(
+      "pnpm --recursive update --latest --lockfile-only --ignore-scripts --no-frozen-lockfile"
+    );
+    expect(pnpmCommand?.command).toContain("pnpm-workspace.yaml");
+  });
+
+  it("runs pnpm from verified manifests even if cached manager metadata is stale", () => {
+    const project = makeProject({
+      id: "migrated-proj",
+      manifests: {
+        composerJson: false,
+        packageJson: true,
+        pnpmLock: true,
+        yarnLock: false,
+        packageLock: false,
+        requirementsIn: false,
+        requirementsTxt: false
+      },
+      jsManager: "npm",
+      declaredPackageManager: "pnpm@10.15.0"
+    });
+
+    const [action] = buildPreviewActions(
+      [project],
+      {},
+      settings,
+      { selectedProjectIds: [project.id] } satisfies RunRequest
+    );
+
+    expect(action.skipReasons).toEqual([]);
+    expect(action.commands.map((command) => command.label)).toContain("pnpm update");
+  });
+
+  it("refuses mixed package-manager lockfiles even when pnpm was previously detected", () => {
+    const project = makeProject({
+      id: "mixed-proj",
+      manifests: {
+        composerJson: true,
+        packageJson: true,
+        pnpmLock: true,
+        yarnLock: false,
+        packageLock: true,
+        requirementsIn: false,
+        requirementsTxt: false
+      },
+      jsManager: "pnpm"
+    });
+
+    const [action] = buildPreviewActions(
+      [project],
+      {},
+      settings,
+      { selectedProjectIds: [project.id] } satisfies RunRequest
+    );
+
+    expect(action.skipReasons).toContain(
+      "JavaScript project has competing lockfile(s): package-lock.json"
+    );
+    expect(action.commands).toEqual([]);
+  });
+
+  it("refuses a non-pnpm packageManager declaration", () => {
+    const project = makeProject({
+      id: "declared-npm",
+      manifests: {
+        composerJson: false,
+        packageJson: true,
+        pnpmLock: true,
+        yarnLock: false,
+        packageLock: false,
+        requirementsIn: false,
+        requirementsTxt: false
+      },
+      jsManager: "pnpm",
+      declaredPackageManager: "npm@11.4.2"
+    });
+
+    const [action] = buildPreviewActions(
+      [project],
+      {},
+      settings,
+      { selectedProjectIds: [project.id] } satisfies RunRequest
+    );
+
+    expect(action.skipReasons).toContain(
+      "package.json declares a non-pnpm package manager: npm@11.4.2"
+    );
+    expect(action.commands).toEqual([]);
   });
 
   it("skips dirty repositories", () => {

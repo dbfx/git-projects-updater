@@ -17,10 +17,11 @@ Electron desktop app for Windows that scans WSL project roots, detects update-ca
 - **Multiple WSL roots** — Save multiple project root paths with configurable scan depth (1–3) and exact exclusions
 - **Automatic project discovery** — Detects projects by manifest files:
   - `composer.json` (PHP / Composer)
-  - `package.json` with lockfile detection (`npm` / `pnpm` / `yarn`)
+  - `package.json` with an exclusive `pnpm-lock.yaml` (npm, Yarn, Bun, and mixed lockfiles are refused)
   - `requirements.in` / `requirements.txt` (Python / pip)
 - **Git eligibility checks** — Only updates repositories on `main` / `master` with a clean working tree
 - **Preview-first workflow** — See exactly what will happen before confirming execution
+- **Lockfile-only pnpm updates** — Updates manifests and `pnpm-lock.yaml` without writing `node_modules` or running lifecycle scripts
 - **Sequential execution** — Runs updates one project at a time with retry logic and push conflict recovery (rebase + retry)
 - **Live run logs** — Watch progress in real time with persisted run history (last 50 runs)
 - **Windows packaging** — NSIS installer and portable .exe
@@ -76,7 +77,7 @@ Output is written to the `release/` directory.
 4. Ensure required tools are installed inside the WSL distro:
    - `git`
    - `composer` (for PHP projects)
-   - `npm` / `pnpm` / `yarn` (for JS projects)
+   - `pnpm` (the only supported package manager for JS projects)
    - `python` / `pip` (for Python projects)
    - `pip-compile` (optional, for `requirements.in`)
 

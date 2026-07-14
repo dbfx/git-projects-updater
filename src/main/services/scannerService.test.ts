@@ -9,7 +9,19 @@ vi.mock("./wslExecutor", () => ({
 }));
 
 describe("scannerService helpers", () => {
-  it("detects js manager by lockfile priority", () => {
+  it("only detects pnpm when there are no competing lockfiles", () => {
+    expect(
+      detectJsManager({
+        composerJson: false,
+        packageJson: true,
+        pnpmLock: true,
+        yarnLock: false,
+        packageLock: false,
+        requirementsIn: false,
+        requirementsTxt: false
+      })
+    ).toBe("pnpm");
+
     expect(
       detectJsManager({
         composerJson: false,
@@ -20,7 +32,7 @@ describe("scannerService helpers", () => {
         requirementsIn: false,
         requirementsTxt: false
       })
-    ).toBe("pnpm");
+    ).not.toBe("pnpm");
 
     expect(
       detectJsManager({

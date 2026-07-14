@@ -40,6 +40,8 @@ export interface ProjectManifests {
   pnpmLock: boolean;
   yarnLock: boolean;
   packageLock: boolean;
+  npmShrinkwrap?: boolean;
+  bunLock?: boolean;
   requirementsIn: boolean;
   requirementsTxt: boolean;
 }
@@ -60,6 +62,8 @@ export interface DiscoveredProject {
   cleanState: "clean" | "dirty" | "unknown";
   enabled: boolean;
   jsManager: JsManager;
+  declaredPackageManager?: string;
+  packageManagerReadError?: boolean;
   skipReason?: string;
 }
 

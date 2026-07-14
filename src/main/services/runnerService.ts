@@ -12,6 +12,7 @@ import {
 } from "../../shared/types";
 import { sleep } from "../lib/utils";
 import { executeWslCommand } from "./wslExecutor";
+import { VERIFY_PNPM_PROJECT_COMMAND } from "./pnpmSafety";
 
 const STDERR_NOISE_PATTERNS: RegExp[] = [
   /screen size is bogus/i,
@@ -38,6 +39,31 @@ interface ValidationResult {
   ok: boolean;
   reason?: string;
   branch?: string;
+}
+
+async function validatePnpmProject(
+  distro: string,
+  projectPath: string,
+  signal?: AbortSignal
+): Promise<ValidationResult> {
+  const outcome = await executeWslCommand({
+    distro,
+    command: VERIFY_PNPM_PROJECT_COMMAND,
+    cwd: projectPath,
+    signal
+  });
+
+  if (outcome.cancelled) {
+    return { ok: false, reason: "Run cancelled" };
+  }
+  if (outcome.code === 0) {
+    return { ok: true };
+  }
+
+  return {
+    ok: false,
+    reason: outcome.stderr.trim() || outcome.stdout.trim() || "pnpm project validation failed"
+  };
 }
 
 function nowIso(): string {
@@ -264,6 +290,25 @@ export class RunnerService {
             reason
           });
           continue;
+        }
+
+        if (project.manifests.packageJson) {
+          const pnpmValidation = await validatePnpmProject(
+            input.distro,
+            project.wslPath,
+            this.controller?.signal
+          );
+          if (!pnpmValidation.ok) {
+            const reason = pnpmValidation.reason ?? "pnpm project validation failed";
+            emit(makeEvent(runId, project.id, project.name, "validate", "warning", reason));
+            results.push({
+              projectId: project.id,
+              projectName: project.name,
+              status: reason === "Run cancelled" ? "cancelled" : "skipped",
+              reason
+            });
+            continue;
+          }
         }
 
         const validation = await validateProjectState(

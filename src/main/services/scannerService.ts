@@ -6,7 +6,13 @@ export function detectJsManager(manifests: ProjectManifests): JsManager {
   if (!manifests.packageJson) {
     return "none";
   }
-  if (manifests.pnpmLock) {
+  if (
+    manifests.pnpmLock &&
+    !manifests.yarnLock &&
+    !manifests.packageLock &&
+    !manifests.npmShrinkwrap &&
+    !manifests.bunLock
+  ) {
     return "pnpm";
   }
   if (manifests.yarnLock) {
@@ -87,6 +93,24 @@ if [ -f package.json ]; then echo "package=1"; else echo "package=0"; fi
 if [ -f pnpm-lock.yaml ]; then echo "pnpm=1"; else echo "pnpm=0"; fi
 if [ -f yarn.lock ]; then echo "yarn=1"; else echo "yarn=0"; fi
 if [ -f package-lock.json ]; then echo "packageLock=1"; else echo "packageLock=0"; fi
+if [ -f npm-shrinkwrap.json ]; then echo "npmShrinkwrap=1"; else echo "npmShrinkwrap=0"; fi
+if [ -f bun.lock ] || [ -f bun.lockb ]; then echo "bunLock=1"; else echo "bunLock=0"; fi
+if [ -f package.json ]; then
+  if command -v node >/dev/null 2>&1; then
+    printf "packageManager="
+    if node -e 'const fs=require("fs"); try { const p=JSON.parse(fs.readFileSync("package.json", "utf8")); const v=typeof p.packageManager === "string" ? p.packageManager : ""; process.stdout.write(v.replace(/[\\r\\n]/g, "")); } catch { process.exit(1); }'; then
+      printf "\\npackageManagerReadError=0\\n"
+    else
+      printf "\\npackageManagerReadError=1\\n"
+    fi
+  else
+    echo "packageManager="
+    echo "packageManagerReadError=1"
+  fi
+else
+  echo "packageManager="
+  echo "packageManagerReadError=0"
+fi
 if [ -f requirements.in ]; then echo "requirementsIn=1"; else echo "requirementsIn=0"; fi
 if [ -f requirements.txt ]; then echo "requirementsTxt=1"; else echo "requirementsTxt=0"; fi
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -122,6 +146,8 @@ fi
     pnpmLock: asBool(parsed.pnpm),
     yarnLock: asBool(parsed.yarn),
     packageLock: asBool(parsed.packageLock),
+    npmShrinkwrap: asBool(parsed.npmShrinkwrap),
+    bunLock: asBool(parsed.bunLock),
     requirementsIn: asBool(parsed.requirementsIn),
     requirementsTxt: asBool(parsed.requirementsTxt)
   };
@@ -149,7 +175,9 @@ fi
     branch: parsed.branch || null,
     cleanState: parsed.clean === "1" ? "clean" : parsed.clean === "0" ? "dirty" : "unknown",
     enabled: preference?.enabled ?? true,
-    jsManager: detectJsManager(manifests)
+    jsManager: detectJsManager(manifests),
+    declaredPackageManager: parsed.packageManager || undefined,
+    packageManagerReadError: asBool(parsed.packageManagerReadError)
   };
 
   project.skipReason = deriveSkipReason(project);

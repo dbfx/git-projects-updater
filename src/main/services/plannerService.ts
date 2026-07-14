@@ -8,6 +8,7 @@ import {
   RunRequest,
   ToolToggles
 } from "../../shared/types";
+import { pnpmEligibilityReason, VERIFY_PNPM_PROJECT_COMMAND } from "./pnpmSafety";
 
 function mergeToolToggles(base: ToolToggles, override?: Partial<ToolToggles>): EffectiveProjectTools {
   return {
@@ -33,10 +34,8 @@ function gitSkipReasons(project: DiscoveredProject): string[] {
 // is not set up with pnpm (no pnpm-lock.yaml) is skipped entirely — npm/yarn/bun
 // are never run.
 function packageManagerSkipReasons(project: DiscoveredProject): string[] {
-  if (project.manifests.packageJson && project.jsManager !== "pnpm") {
-    return ["JavaScript project does not use pnpm (only pnpm is supported)"];
-  }
-  return [];
+  const reason = pnpmEligibilityReason(project);
+  return reason ? [reason] : [];
 }
 
 function buildToolCommands(project: DiscoveredProject, tools: EffectiveProjectTools): PlannedCommand[] {
@@ -50,10 +49,12 @@ function buildToolCommands(project: DiscoveredProject, tools: EffectiveProjectTo
   }
 
   // pnpm only — npm/yarn/bun are never run. Non-pnpm JS repos are skipped upstream.
-  if (project.manifests.packageJson && project.jsManager === "pnpm" && tools.pnpm) {
+  if (project.manifests.packageJson && tools.pnpm) {
     commands.push({
       label: "pnpm update",
-      command: "pnpm update --reporter=silent",
+      command:
+        "pnpm update --latest --lockfile-only --ignore-scripts --no-frozen-lockfile --reporter=silent && " +
+        "if [ -f pnpm-workspace.yaml ]; then pnpm --recursive update --latest --lockfile-only --ignore-scripts --no-frozen-lockfile --reporter=silent; fi",
       retriable: true
     });
   }
@@ -119,6 +120,13 @@ export function buildPreviewActions(
           label: "Git pull",
           command: `git pull --ff-only origin ${project.branch || "HEAD"}`,
           retriable: true
+        });
+      }
+
+      if (skipReasons.length === 0 && project.manifests.packageJson) {
+        commands.push({
+          label: "Verify pnpm project",
+          command: VERIFY_PNPM_PROJECT_COMMAND
         });
       }
 
