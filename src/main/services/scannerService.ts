@@ -1,6 +1,7 @@
 import { DiscoveredProject, JsManager, ProjectManifests, ProjectPreference, ScanRoot, ScanResult } from "../../shared/types";
 import { basename, normalizeWslPath, projectIdFromPath, shellEscape } from "../lib/utils";
 import { executeWslCommand } from "./wslExecutor";
+import { READ_PACKAGE_MANAGER_SCRIPT } from "./pnpmSafety";
 
 export function detectJsManager(manifests: ProjectManifests): JsManager {
   if (!manifests.packageJson) {
@@ -98,7 +99,7 @@ if [ -f bun.lock ] || [ -f bun.lockb ]; then echo "bunLock=1"; else echo "bunLoc
 if [ -f package.json ]; then
   if command -v node >/dev/null 2>&1; then
     printf "packageManager="
-    if node -e 'const fs=require("fs"); try { const p=JSON.parse(fs.readFileSync("package.json", "utf8")); const v=typeof p.packageManager === "string" ? p.packageManager : ""; process.stdout.write(v.replace(/[\\r\\n]/g, "")); } catch { process.exit(1); }'; then
+    if node -e '${READ_PACKAGE_MANAGER_SCRIPT}'; then
       printf "\\npackageManagerReadError=0\\n"
     else
       printf "\\npackageManagerReadError=1\\n"

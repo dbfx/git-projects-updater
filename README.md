@@ -77,7 +77,7 @@ Output is written to the `release/` directory.
 4. Ensure required tools are installed inside the WSL distro:
    - `git`
    - `composer` (for PHP projects)
-   - `pnpm` (the only supported package manager for JS projects)
+   - `node` and `pnpm` on the non-interactive WSL `PATH` (the app does not activate nvm/fnm)
    - `python` / `pip` (for Python projects)
    - `pip-compile` (optional, for `requirements.in`)
 

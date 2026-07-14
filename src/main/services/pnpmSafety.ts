@@ -35,22 +35,29 @@ export function pnpmEligibilityReason(project: DiscoveredProject): string | unde
   return undefined;
 }
 
+// Avoid double quotes inside the single-quoted `node -e` argument. wsl.exe's
+// Windows argument escaping preserves backslashes inside shell single quotes.
+export const READ_PACKAGE_MANAGER_SCRIPT =
+  'const fs=require(`fs`); try { const p=JSON.parse(fs.readFileSync(`package.json`, `utf8`)); const v=typeof p.packageManager === `string` ? p.packageManager : ``; process.stdout.write(v.replace(/[\\r\\n]/g, ``)); } catch { process.exit(1); }';
+
 // This is run again after git pull so a remote package-manager migration cannot
 // bypass the scan/preview checks. It intentionally rejects ambiguous mixed-lockfile
 // repositories instead of guessing which package manager owns the lock state.
-export const VERIFY_PNPM_PROJECT_COMMAND = `
-fail() { echo "$1" 1>&2; exit 42; }
-[ -f package.json ] || fail "Refusing update: package.json is missing"
-[ -f pnpm-lock.yaml ] || fail "Refusing update: pnpm-lock.yaml is missing"
-conflicts=""
-for lockfile in package-lock.json npm-shrinkwrap.json yarn.lock bun.lock bun.lockb; do
-  [ ! -f "$lockfile" ] || conflicts="$conflicts $lockfile"
-done
-[ -z "$conflicts" ] || fail "Refusing update: competing package-manager lockfile(s):$conflicts"
-command -v node >/dev/null 2>&1 || fail "Refusing update: Node.js is unavailable, so package.json cannot be verified"
-declared="$(node -e 'const fs=require("fs"); try { const p=JSON.parse(fs.readFileSync("package.json", "utf8")); const v=typeof p.packageManager === "string" ? p.packageManager : ""; process.stdout.write(v.replace(/[\\r\\n]/g, "")); } catch { process.exit(1); }')" || fail "Refusing update: package.json is invalid"
-case "$declared" in
-  ""|pnpm|pnpm@*) ;;
-  *) fail "Refusing update: package.json declares non-pnpm package manager '$declared'" ;;
-esac
-`.trim();
+export const VERIFY_PNPM_PROJECT_COMMAND = [
+  'fail() { echo "$1" 1>&2; exit 42; }',
+  '[ -f package.json ] || fail "Refusing update: package.json is missing"',
+  '[ -f pnpm-lock.yaml ] || fail "Refusing update: pnpm-lock.yaml is missing"',
+  'conflicts=""',
+  'for lockfile in package-lock.json npm-shrinkwrap.json yarn.lock bun.lock bun.lockb; do',
+  '  [ ! -f "$lockfile" ] || conflicts="$conflicts $lockfile"',
+  "done",
+  '[ -z "$conflicts" ] || fail "Refusing update: competing package-manager lockfile(s):$conflicts"',
+  'command -v node >/dev/null 2>&1 || fail "Refusing update: Node.js must already be installed and available on PATH"',
+  'command -v pnpm >/dev/null 2>&1 || fail "Refusing update: pnpm must already be installed and available on PATH"',
+  'pnpm --version >/dev/null 2>&1 || fail "Refusing update: installed pnpm is not usable with the installed Node.js version"',
+  `if ! declared="$(node -e '${READ_PACKAGE_MANAGER_SCRIPT}')"; then fail "Refusing update: package.json is invalid"; fi`,
+  'case "$declared" in',
+  '  ""|pnpm|pnpm@*) ;;',
+  "  *) fail \"Refusing update: package.json declares non-pnpm package manager '$declared'\" ;;",
+  "esac"
+].join("\n");
