@@ -1,5 +1,12 @@
 # Changelog
 
+# [0.5.0](https://github.com/dbfx/git-projects-updater/compare/v0.4.0...v0.5.0) (2026-07-14)
+
+
+### Bug Fixes
+
+* harden pnpm dependency updates ([96173a5](https://github.com/dbfx/git-projects-updater/commit/96173a5e4f681ef619989f0201cecf6dd3260a21))
+
 # [0.4.0](https://github.com/dbfx/git-projects-updater/compare/v0.3.1...v0.4.0) (2026-03-03)
 
 
