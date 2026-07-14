@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/dbfx/git-projects-updater/compare/v0.5.0...v0.5.1) (2026-07-14)
+
+
+### Bug Fixes
+
+* remove Node version manager bootstrap ([6ee03f3](https://github.com/dbfx/git-projects-updater/commit/6ee03f3980fdc5a25bef240c830b6bbb783f42e9))
+
 # [0.5.0](https://github.com/dbfx/git-projects-updater/compare/v0.4.0...v0.5.0) (2026-07-14)
 
 
